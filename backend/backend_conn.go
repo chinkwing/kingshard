@@ -41,7 +41,9 @@ type Conn struct {
 	password string
 	db       string
 
-	capability uint32
+	protocolVer byte
+	serverVer   string
+	capability  uint32
 
 	status uint16
 
@@ -145,11 +147,14 @@ func (c *Conn) writePacket(data []byte) error {
 	return err
 }
 
+//from server to client
 func (c *Conn) readInitialHandshake() error {
 	data, err := c.readPacket()
 	if err != nil {
 		return err
 	}
+	//protocol version
+	c.protocolVer = data[0]
 
 	if data[0] == mysql.ERR_HEADER {
 		return errors.New("read initial handshake error")
@@ -159,10 +164,14 @@ func (c *Conn) readInitialHandshake() error {
 		return fmt.Errorf("invalid protocol version %d, must >= 10", data[0])
 	}
 
+	//parse server version
+	sPos := bytes.IndexByte(data[1:], 0x00)
+	c.serverVer = string(data[1 : sPos+1])
+
 	//skip mysql version and connection id
 	//mysql version end with 0x00
 	//connection id length is 4
-	pos := 1 + bytes.IndexByte(data[1:], 0x00) + 1 + 4
+	pos := 1 + sPos + 1 + 4
 
 	c.salt = append(c.salt, data[pos:pos+8]...)
 
@@ -230,6 +239,7 @@ func (c *Conn) writeAuthHandshake() error {
 
 	c.capability = capability
 
+	//head + authentication packet
 	data := make([]byte, length+4)
 
 	//capability [32 bit]
@@ -270,6 +280,8 @@ func (c *Conn) writeAuthHandshake() error {
 	return c.writePacket(data)
 }
 
+//Bytes		Name
+// 1		command
 func (c *Conn) writeCommand(command byte) error {
 	c.pkg.Sequence = 0
 
@@ -282,6 +294,9 @@ func (c *Conn) writeCommand(command byte) error {
 	})
 }
 
+//Bytes		Name
+// 1		command
+// n		arg
 func (c *Conn) writeCommandBuf(command byte, arg []byte) error {
 	c.pkg.Sequence = 0
 
@@ -299,7 +314,7 @@ func (c *Conn) writeCommandBuf(command byte, arg []byte) error {
 func (c *Conn) writeCommandStr(command byte, arg string) error {
 	c.pkg.Sequence = 0
 
-	length := len(arg) + 1
+	length := len(arg) + 1 //Terminated with \0x00
 
 	data := make([]byte, length+4)
 
@@ -331,7 +346,7 @@ func (c *Conn) writeCommandUint32(command byte, arg uint32) error {
 func (c *Conn) writeCommandStrStr(command byte, arg1 string, arg2 string) error {
 	c.pkg.Sequence = 0
 
-	data := make([]byte, 4, 6+len(arg1)+len(arg2))
+	data := make([]byte, 4, 4+len(arg1)+1+len(arg2)+1)
 
 	data = append(data, command)
 	data = append(data, arg1...)
@@ -503,6 +518,26 @@ func (c *Conn) exec(query string) (*mysql.Result, error) {
 	return c.readResult(false)
 }
 
+//Result Set Packet consisted by:
+//1.Result Set Head Packet (1 packet)
+//Bytes                 Name
+//-----                 ----
+//1-9（Length-Coded-Binary） field_count
+//1-9（Length-Coded-Binary）extra
+
+//2.Field Packet (n packet)
+
+//3.EOF Packet (1 packet)
+//Bytes                 Name
+//-----                 ----
+//1                     field_count, always = 0xfe
+//2                     warning_count
+//2                     Status Flags
+
+//4.Row Data Packet (n packet)
+
+//5.EOF Packet (1 packet)
+
 func (c *Conn) readResultset(data []byte, binary bool) (*mysql.Result, error) {
 	result := &mysql.Result{
 		Status:       0,
@@ -626,6 +661,12 @@ func (c *Conn) readUntilEOF() (err error) {
 	return
 }
 
+//EoF Packet VERSION 4.1
+//Bytes                 Name
+//-----                 ----
+//1                     field_count, always = 0xfe
+//2                     warning_count
+//2                     Status Flags
 func (c *Conn) isEOFPacket(data []byte) bool {
 	return data[0] == mysql.EOF_HEADER && len(data) <= 5
 }

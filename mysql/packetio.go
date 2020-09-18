@@ -16,6 +16,7 @@ package mysql
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -23,6 +24,10 @@ import (
 
 const (
 	defaultReaderSize = 8 * 1024
+)
+
+var (
+	Err_NotSupportPROTOCOL_40 = errors.New("not support protocol version 4.0")
 )
 
 type PacketIO struct {
@@ -43,6 +48,7 @@ func NewPacketIO(conn net.Conn) *PacketIO {
 	return p
 }
 
+//return response packet without head
 func (p *PacketIO) ReadPacket() ([]byte, error) {
 	header := []byte{0, 0, 0, 0}
 

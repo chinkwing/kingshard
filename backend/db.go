@@ -118,7 +118,7 @@ func (db *DB) State() string {
 	case Down, ManualDown:
 		state = "down"
 	case Unknown:
-		state = "unknow"
+		state = "unknown"
 	}
 	return state
 }
@@ -315,6 +315,7 @@ func (db *DB) GetConnFromCache(cacheConns chan *Conn) *Conn {
 	for 0 < len(cacheConns) {
 		co = <-cacheConns
 		atomic.AddInt64(&db.popConnCount, 1)
+		//check whether this conn is still alive
 		if co != nil && PingPeroid < time.Now().Unix()-co.pushTimestamp {
 			err = co.Ping()
 			if err != nil {
@@ -368,6 +369,7 @@ func (db *DB) PushConn(co *Conn, err error) {
 		db.addIdleConn()
 		return
 	}
+	//todo: Try reuse conn in here?
 	conns := db.getCacheConns()
 	if conns == nil {
 		co.Close()

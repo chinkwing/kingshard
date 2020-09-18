@@ -317,3 +317,41 @@ func init() {
 		}
 	}
 }
+
+//when COM_STMT_EXECUTE offset is 0,otherwise offset if 2
+func GetNullBitmapBytes(fieldNum int, isExecute bool) int {
+	offset := 2
+	if isExecute {
+		offset = 0
+	}
+
+	return (fieldNum + 7 + offset) / 8
+}
+
+func GetNullBitmapBytePos(fieldIndex int, isExecute bool) int {
+	offset := 2
+	if isExecute {
+		offset = 0
+	}
+
+	return (fieldIndex + offset) / 8
+}
+
+func GetNullBitmapBitPos(fieldIndex int, isExecute bool) int {
+	offset := 2
+	if isExecute {
+		offset = 0
+	}
+
+	return (fieldIndex + offset) % 8
+}
+
+func IsFieldValueNull(nullBitMap []byte, fieldIndex int, isExecute bool) bool {
+	bytePos := GetNullBitmapBytePos(fieldIndex, isExecute)
+	bitPos := GetNullBitmapBitPos(fieldIndex, isExecute)
+	if nullBitMap[bytePos]&(1<<bitPos) > 0 {
+		return true
+	}
+
+	return false
+}

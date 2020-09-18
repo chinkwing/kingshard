@@ -88,7 +88,7 @@ func (p RowData) ParseBinary(f []*Field) ([]interface{}, error) {
 		return nil, ErrMalformPacket
 	}
 
-	pos := 1 + ((len(f) + 7 + 2) >> 3)
+	pos := 1 + GetNullBitmapBytes(len(f), false)
 
 	nullBitmap := p[1:pos]
 
@@ -98,7 +98,7 @@ func (p RowData) ParseBinary(f []*Field) ([]interface{}, error) {
 	var err error
 	var v []byte
 	for i := range data {
-		if nullBitmap[(i+2)/8]&(1<<(uint(i+2)%8)) > 0 {
+		if IsFieldValueNull(nullBitmap, i, false) {
 			data[i] = nil
 			continue
 		}
@@ -265,7 +265,7 @@ type Result struct {
 	Status uint16
 
 	InsertId     uint64
-	AffectedRows uint64
+	AffectedRows uint64 //affected by INSERT/UPDATE/DELETE
 
 	*Resultset
 }

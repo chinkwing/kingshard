@@ -44,7 +44,7 @@ func (p FieldData) Parse() (f *Field, err error) {
 
 	var n int
 	pos := 0
-	//skip catelog, always def
+	//skip catalog, always def
 	n, err = SkipLengthEnodedString(p)
 	if err != nil {
 		return
@@ -86,7 +86,7 @@ func (p FieldData) Parse() (f *Field, err error) {
 	}
 	pos += n
 
-	//skip oc
+	//skip 0x0c
 	pos += 1
 
 	//charset
